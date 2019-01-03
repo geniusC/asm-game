@@ -80,12 +80,13 @@ putstr:		push bp
 			push [bp + 4]
 			call strlen				;获取字符串长度
 			mov cx, ax
+
 			mov ax, 10				;计算Y坐标
 			mul bh
 			add ax, 0b800H
 			mov es, ax
 
-			shl	bl			;计算X坐标
+			shl	bl,	1		;计算X坐标
 			mov bh, 0
 ps@p:		mov al, [si]			;读取字符 输出到显示缓冲区
 			mov es:[bx], al
@@ -146,6 +147,81 @@ int9@ret:	pop es
 			pop bp
 			iret
 
+;函数draw_rec(byte x, byte y, byte width, byte height)
+;功能: 在指定位置绘制方框
+;参数: x: 横坐标, y: 纵坐标, width: 宽度, heigh: 高度
+draw_rec:	push bp
+			mov bp, sp
+			push cx
+			push es
+			push ds
+			push si
+			push bx
+			mov bx, [bp + 4]	;bh纵坐标， bl横坐标
+
+			mov ax, 10			;计算纵坐标
+			mul bh
+			add ax, 0b800H
+			mov ds, ax
+
+			mov ax, 10
+			dec byte ptr [bp + 6]
+			mul byte ptr [bp + 6]
+			add ax, 0b800H
+			mov es, ax
+
+;绘制水平边
+			mov cx, 0
+			mov cl, [bp + 7]	;宽度
+			mov byte ptr ds:[bx], '+'
+			mov byte ptr ds:[bx + 1], 00000111B
+			mov byte ptr es:[bx], '+'
+			mov byte ptr es:[bx + 1], 00000111B
+			add bx, 2
+			sub cx, 2
+dr@horizon:	mov byte ptr ds:[bx], '-'
+			mov byte ptr ds:[bx + 1], 00000111B		;黑底白字
+			mov byte ptr es:[bx], '-'
+			mov byte ptr es:[bx + 1], 00000111B
+			add bx, 2
+			loop dr@horizon
+			mov byte ptr ds:[bx], '+'
+			mov byte ptr ds:[bx + 1], 00000111B
+			mov byte ptr es:[bx], '+'
+			mov byte ptr es:[bx + 1], 00000111B
+
+;绘制竖直边
+			mov bx, [bp + 4]
+			shl bl, 1			;计算横坐标
+			mov bh, 0
+
+			mov cl, [bp + 7]
+			mov ch, 0
+			dec cl
+			shl cl, 1
+			mov si, cx
+			add si, bx
+
+			mov ax, ds
+			mov cx, es
+dr@vertical:add ax, 10
+			cmp ax, cx
+			je dr@ret
+			mov ds, ax
+			mov byte ptr ds:[bx], '|'
+			mov byte ptr ds:[bx + 1], 00000111B
+			mov byte ptr ds:[si], '|'
+			mov byte ptr ds:[si + 1], 00000111B
+			jmp dr@vertical
+
+dr@ret:		pop bx
+			pop si
+			pop ds	
+			pop	es	
+			pop cx
+			pop bp
+			ret 4
+
 main:		mov ax, 0003H
 			int 10H
 
@@ -168,6 +244,14 @@ main:		mov ax, 0003H
 			mov word ptr es:[9 * 4], offset int9;替换中断向量表
 			mov es:[9 * 4 + 2], cs
 			sti						;允许中断
+
+			mov ah, 80
+			mov al, 25
+			push ax
+			mov ax, 0
+			push ax
+			call draw_rec
+			
 
 s:			mov cx, 2
 			loop s
