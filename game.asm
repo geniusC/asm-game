@@ -23,8 +23,8 @@ strlen:		push bp
 			push cx
 			push si
 			mov bx, [bp + 4]			;获取字符串首地址
-			mov si, 0
-			mov cx, 0
+			xor si, si
+			xor cx, cx
 sl@char:	mov cl, [bx + si]			;取出字符
 			jcxz sl@ok
 			inc si
@@ -87,7 +87,7 @@ putstr:		push bp
 			mov es, ax
 
 			shl	bl,	1		;计算X坐标
-			mov bh, 0
+			xor bh, bh
 ps@p:		mov al, [si]			;读取字符 输出到显示缓冲区
 			mov es:[bx], al
 			mov byte ptr es:[bx + 1], 00000111B
@@ -117,14 +117,14 @@ int9:		push bp
 			cmp al, 1
 			je on@esc
 			jmp int9@ret
-on@left:	mov ax, 0
+on@left:	xor ax, ax
 			push ax
 			mov ax, offset left
 			push ax
 			call putstr
 			jmp int9@ret
 
-on@right:	mov ax, 0
+on@right:	xor ax, ax
 			push ax
 			mov ax, offset right
 			push ax
@@ -132,7 +132,7 @@ on@right:	mov ax, 0
 			jmp int9@ret
 
 ;恢复int9向量表并退出程序
-on@esc:		mov ax, 0
+on@esc:		xor ax, ax
 			mov es, ax
 			push [int9_offset]
 			pop es:[9 * 4]
@@ -171,7 +171,7 @@ draw_rec:	push bp
 			mov es, ax
 
 ;绘制水平边
-			mov cx, 0
+			xor cx, cx
 			mov cl, [bp + 7]	;宽度
 			mov byte ptr ds:[bx], '+'
 			mov byte ptr ds:[bx + 1], 00000111B
@@ -193,10 +193,10 @@ dr@horizon:	mov byte ptr ds:[bx], '-'
 ;绘制竖直边
 			mov bx, [bp + 4]
 			shl bl, 1			;计算横坐标
-			mov bh, 0
+			xor bh, bh
 
 			mov cl, [bp + 7]
-			mov ch, 0
+			xor ch, ch
 			dec cl
 			shl cl, 1
 			mov si, cx
@@ -232,7 +232,7 @@ main:		mov ax, 0003H
 			mov ax, data
 			mov ds, ax
 ;安装int9中断
-			mov ax, 0
+			xor ax, ax
 			mov es, ax
 ;保存原始int9中断段地址和偏移量
 			push es:[9 * 4]			
@@ -248,7 +248,7 @@ main:		mov ax, 0003H
 			mov ah, 80
 			mov al, 25
 			push ax
-			mov ax, 0
+			xor ax, ax
 			push ax
 			call draw_rec
 			
