@@ -1,22 +1,33 @@
 assume cs: code, ss: stksg, ds: data
 
 data segment
+
 int9_offset dw 0
 int9_segment dw 0
+
 keyboard_handler dw 0
-left db 'left',0
+
 start_tips db 'press any key to start...', 0
+
+menu_cursor db 0
+menu db 'flappy bird', 0a
+'snake', 0
+
 signature_filename db 'SIGN.TXT', 0
 signature db 151H dup(0)
+
 data ends
 
 stksg segment stack
 db 300H dup (0)
 stksg ends
 
+
 code segment 
+;*************************************************************
 ;函数:		initial()
-;功能:		进行初始化
+;功能:		初始化
+;*************************************************************
 initial proc
 ;清屏
 			push cx
@@ -27,13 +38,16 @@ initial proc
 			mov cl, 0
 			mov ah, 1
 			int 10H
+			call init_keyboard
 			pop cx
 			ret
 initial endp
+;*************************************************************
 ;函数:		strlen(byte[] str)
 ;功能:		获取字符串长度
 ;参数:		str 字符串首地址
 ;返回值:	字符串长度
+;*************************************************************
 strlen proc
 			push bp
 			mov bp, sp
@@ -55,10 +69,11 @@ sl@ok:		mov ax, si
 			pop bp
 			ret 2
 strlen endp
-
+;******************************************************************
 ;函数putc(byte char, byte property, byte y, byte x)
 ;功能:		将字符输出在指定位置
 ;参数:		char: 字符， property: 输出属性, y: 纵坐标, x: 横坐标
+;******************************************************************
 putc proc	
 			push bp
 			mov bp, sp
@@ -88,9 +103,11 @@ pc@ok:		pop cx
 			pop bp
 			ret 4
 putc endp
+;*************************************************************
 ;函数putstr(byte[] str, byte y, byte x)
 ;功能:		在指定位置输出字符串
 ;参数:		str: 字符串数组, x: 横坐标, y: 纵坐标 
+;*************************************************************
 putstr proc	
 			push bp
 			mov bp, sp
@@ -134,9 +151,11 @@ ps@lp:		inc si
 putstr endp
 
 
+;*************************************************************
 ;函数draw_rec(byte y, byte x, byte width, byte height)
 ;功能: 在指定位置绘制方框
 ;参数: x: 横坐标, y: 纵坐标, width: 宽度, heigh: 高度
+;*************************************************************
 draw_rec proc
 			push bp
 			mov bp, sp
@@ -213,6 +232,7 @@ dr@ret:		pop bx
 			pop bp
 			ret 4
 draw_rec endp
+;*************************************************************
 ;函数read_file(byte[] filename, byte[] buffer, word length)
 ;功能:		从文件读取内容
 ;参数:		filename	文件名
@@ -220,6 +240,7 @@ draw_rec endp
 ;			length		长度
 ;返回值:	 0		成功
 ;			其他	失败	
+;*************************************************************
 read_file proc
 			push bp
 			mov bp, sp
@@ -254,6 +275,7 @@ rf@err:		pop dx
 			ret 6
 read_file endp
 
+;*************************************************************
 ;函数:	write_file(byte[] filename, byte[] buffer, word length, word append)
 ;功能:	写入数据到文件
 ;参数:	filename	文件名
@@ -262,6 +284,7 @@ read_file endp
 ;		append		1:追加	0:覆盖
 ;返回值:	0		成功
 ;			其他	失败
+;*************************************************************
 write_file proc
 			push bp
 			mov bp, sp
@@ -313,24 +336,30 @@ wf@err:		pop bx
 			ret 8
 write_file endp
 
-;函数:	regist_keyboardhandler(function handler(byte key))
-;功能:	注册键盘处理函数
-;参数:	handler 键盘处理函数 接受一个byte参数
-regist_keyboardhandler proc
+;*************************************************************
+;函数:	init_keyboard()
+;功能:	初始化键盘
+;*************************************************************
+init_keyboard proc
 			jmp rgt@begin		;跳转到函数开始
 ;中断9 键盘控制
 int9:		push bp		
 			mov bp, sp
+			sub sp, 2			;申请栈空间 保存按键值
 			push ax
 			push es
 			in al, 60H					;从端口60读取键盘输入
 			pushf					;标志寄存器入栈
 			call dword ptr [int9_offset]	;调用原始int9中断
-			cmp al, 1
-			je on@esc
 			xor ah, ah
-			push ax
+			mov [bp - 2], ax
+			mov ax, [keyboard_handler]
+			test ax, ax
+			je int9@nh
+			push [bp - 2]
 			call word ptr [keyboard_handler]
+int9@nh:	cmp word ptr [bp - 2], 1
+			je on@esc
 			jmp int9@ret
 ;恢复int9向量表并退出程序
 on@esc:		xor ax, ax
@@ -345,6 +374,7 @@ on@esc:		xor ax, ax
 
 int9@ret:	pop es
 			pop ax
+			add sp, 2
 			pop bp
 			iret
 
@@ -354,9 +384,6 @@ rgt@begin:	push bp
 
 			xor ax, ax
 			mov es, ax
-;设置键盘处理器
-			mov ax, [bp + 4]
-			mov word ptr [keyboard_handler], ax
 ;保存原始int9中断段地址和偏移量
 			push es:[9 * 4]			
 			pop [int9_offset]
@@ -370,25 +397,46 @@ rgt@begin:	push bp
 
 			pop es
 			pop bp
+			ret
+init_keyboard endp
+
+
+;*************************************************************
+;函数:	regist_keyboardhandler(function handler(byte key))
+;功能:	注册键盘处理函数
+;参数:	handler 键盘处理函数 接受一个byte参数
+;*************************************************************
+regist_keyboardhandler proc
+			push bp
+			mov bp, sp
+
+			mov ax, [bp + 4]
+			mov word ptr [keyboard_handler], ax
+
+			pop bp
 			ret 2
 regist_keyboardhandler endp
 
-test_keyboardhandler proc
+first_keyboardhandler proc
 			push bp
 			mov bp, sp
-			mov ax, [bp + 4]
-			cmp al, 4bH
-			je on@left
-			jmp handler@ret
-on@left:	xor ax, ax
+			lea ax, menu_keyboardhandler
 			push ax
-			mov ax, offset left
-			push ax
-			call putstr
+			call regist_keyboardhandler
 
-handler@ret:pop bp
+
+
+			pop bp
 			ret 2
-test_keyboardhandler endp
+first_keyboardhandler endp
+
+menu_keyboardhandler proc
+			push bp
+			mov bp, sp
+			lea ax, 
+			pop bp
+			ret 2
+menu_keyboardhandler endp
 
 
 ;设置栈段和数据段
